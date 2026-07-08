@@ -35,6 +35,10 @@ const INITIAL_FORM: FormData = {
   remarque: "",
 };
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.PROD ? "https://beach-chair-backend.onrender.com/api/v1" : "http://127.0.0.1:8000/api/v1");
+
 function SelectField({
   label,
   value,
@@ -128,6 +132,8 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
   const [form, setForm] = useState<FormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [step, setStep] = useState<Step>("form");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (product) setSelectedProduct(product);
@@ -138,6 +144,8 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
       setForm(INITIAL_FORM);
       setErrors({});
       setStep("form");
+      setIsSubmitting(false);
+      setSubmitError(null);
     }
   }, [open]);
 
@@ -169,7 +177,43 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
     if (validate()) setStep("summary");
   };
 
-  const handleConfirm = () => setStep("confirmed");
+  const handleConfirm = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nom: form.nom.trim(),
+          prenom: form.prenom.trim(),
+          telephone: form.telephone.trim(),
+          wilaya_code: form.wilayaCode,
+          commune: form.commune,
+          adresse: form.adresse.trim(),
+          remarque: form.remarque.trim() || null,
+          product_id: selectedProduct.id,
+          quantity: form.quantite,
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const message = payload?.detail || "Impossible d'envoyer la commande";
+        throw new Error(Array.isArray(message) ? message.join(", ") : message);
+      }
+
+      setStep("confirmed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const communeOptions = selectedWilaya
     ? selectedWilaya.communes.map((c) => ({ value: c, label: c }))
@@ -402,6 +446,14 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
                         </motion.div>
                       )}
 
+                      {submitError && step === "summary" && (
+                        <div className="px-8 pb-4">
+                          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {submitError}
+                          </div>
+                        </div>
+                      )}
+
                       {/* CONFIRMED STEP */}
                       {step === "confirmed" && (
                         <motion.div
@@ -480,10 +532,11 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={step === "form" ? handleSubmit : handleConfirm}
+                        disabled={isSubmitting}
                         className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-[#0077B6] to-[#00B4D8] text-white shadow-md shadow-[#0077B6]/20"
-                        style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+                        style={{ fontFamily: "Inter, sans-serif", fontWeight: 600, opacity: isSubmitting ? 0.7 : 1 }}
                       >
-                        {step === "form" ? "Voir le récapitulatif →" : "Confirmer la commande ✓"}
+                        {isSubmitting ? "Envoi..." : step === "form" ? "Voir le récapitulatif →" : "Confirmer la commande ✓"}
                       </motion.button>
                     </div>
                   )}

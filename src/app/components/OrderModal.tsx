@@ -37,7 +37,7 @@ const INITIAL_FORM: FormData = {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ??
-  (import.meta.env.PROD ? "" : "http://127.0.0.1:8000/api/v1");
+  (import.meta.env.PROD ? "https://beach-chair-backend.onrender.com/api/v1" : "http://127.0.0.1:8000/api/v1");
 
 function SelectField({
   label,
@@ -182,10 +182,6 @@ export function OrderModal({ open, product, onClose }: OrderModalProps) {
     setSubmitError(null);
 
     try {
-      if (!API_BASE_URL) {
-        throw new Error("VITE_API_URL manquant sur Vercel");
-      }
-
       const res = await fetch(`${API_BASE_URL}/orders/`, {
         method: "POST",
         headers: {
